@@ -1,0 +1,116 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM template to deploy Lambda, DynamoDB, and S3 for visitor logs.
+
+Resources:
+  VisitorLogApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: VisitorLogAPI
+      Cors:
+        AllowOrigin: "'*'"                  # Replace '*' with your specific domain for stricter security
+        AllowHeaders: "'Content-Type'"
+        AllowMethods: "'GET,POST,OPTIONS'"
+        MaxAge: 300
+      StageName: Prod
+
+  VisitorLogsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: VisitorLogs
+      AttributeDefinitions:
+        - AttributeName: IP
+          AttributeType: S
+        - AttributeName: Timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: IP
+          KeyType: HASH
+        - AttributeName: Timestamp
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST
+
+  StaticHostingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: portfolio-visitor-logs
+      WebsiteConfiguration:
+        IndexDocument: index.html
+    DeletionPolicy: Retain # Keeps the bucket if the stack is deleted
+
+  StaticBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticHostingBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: "*"
+            Action: s3:GetObject
+            Resource: !Sub "${StaticHostingBucket.Arn}/*"
+
+  VisitorLogFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      ImageUri: 975050306625.dkr.ecr.us-east-1.amazonaws.com/visitor-logs:latest
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref VisitorLogsTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /visitor
+            Method: POST
+            RestApiId: !Ref VisitorLogApi
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: DynamoDBAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                Resource: !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/${VisitorLogsTable}"
+        - PolicyName: LambdaBasicExecution
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource: "*"
+
+Outputs:
+  LambdaEndpoint:
+    Description: Endpoint for the Lambda function
+    Value: !Sub "https://${VisitorLogApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/visitor"
+
+  S3BucketURL:
+    Description: Static website URL
+    Value: !GetAtt StaticHostingBucket.WebsiteURL
+
+  DynamoDBTableName:
+    Description: DynamoDB Table Name
+    Value: !Ref VisitorLogsTable
