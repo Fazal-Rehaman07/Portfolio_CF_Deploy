@@ -54,7 +54,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       PackageType: Image
-      ImageUri: 975050306625.dkr.ecr.us-east-1.amazonaws.com/visitor-logs:latest
+      ImageUri: <YOUR_ECR_IMAGE_URI>
       Role: !GetAtt LambdaExecutionRole.Arn
       Environment:
         Variables:
