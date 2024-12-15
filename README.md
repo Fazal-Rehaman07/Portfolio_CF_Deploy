@@ -3,6 +3,12 @@
 
 This project deploys a Lambda function that stores visitor logs in DynamoDB, an API Gateway to handle incoming HTTP requests, and an S3 bucket for static website hosting. The deployment is done using AWS SAM (Serverless Application Model) and the resources are managed with AWS CloudFormation.
 
+## Architecture:
+- Deploy Static Portfolio website to S3
+- Create API Gateway to connect Portfolio and Lambda
+- Deploy Container Image of Go App on AWS Lambda
+- Create DynamoDB table to store Visitor-Logs
+
 ## Prerequisites
 
 1. **AWS CLI**: Make sure the AWS Command Line Interface (CLI) is installed and configured with your credentials.
